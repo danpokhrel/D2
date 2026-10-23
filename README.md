@@ -14,6 +14,7 @@ Tooling adapted from the [CMPM 121 Fall 2026 D1 starter](https://github.com/ucsc
 - [DemoClips Page](https://gallery.democlips.dev/94741/905020)
 - [Lectures](https://drive.google.com/drive/folders/1624F_OwJeTv9GGrUJ9kJiYKiUAqJ1gDK?usp=drive_link)
 - [Mozilla Docs (MDN)](https://developer.mozilla.org/en-US/)
+- [Github Pages Deployment](https://danpokhrel.github.io/D2/)
 
 ## Notes
 

@@ -6,8 +6,10 @@ heading.textContent = "D2 project";
 const message = document.createElement("p");
 message.textContent = "Click and drag to draw!";
 
-const CANVAS_WIDTH = 200;
-const CANVAS_HEIGHT = 200;
+const buttonGroup = document.createElement("div");
+
+const CANVAS_WIDTH = 1000;
+const CANVAS_HEIGHT = 600;
 
 /*
  * A lot of this beginning structure was paraphrased from the QuantPaint assignment.
@@ -21,6 +23,9 @@ canvas.height = CANVAS_HEIGHT;
 
 const context = canvas.getContext("2d")!;
 
+context.lineWidth = 4;
+context.lineCap = "round";
+
 interface mouseData {
   x: number;
   y: number;
@@ -32,6 +37,7 @@ canvas.addEventListener("mousedown", GetMouseData);
 canvas.addEventListener("mouseup", GetMouseData);
 
 canvas.addEventListener("mousemove", Draw);
+canvas.addEventListener("mouseenter", GetMouseData);
 
 function GetMouseData(data: MouseEvent) {
   mouse.x = data.offsetX;
@@ -53,9 +59,10 @@ function Draw(data: MouseEvent) {
 const clearButt = document.createElement("button");
 clearButt.textContent = "Erase All";
 clearButt.addEventListener("click", Clear);
+buttonGroup.append(clearButt);
 
 function Clear() {
   context.clearRect(0, 0, canvas.width, canvas.height);
 }
 
-app.append(heading, message, canvas, clearButt);
+app.append(heading, message, canvas, buttonGroup);
