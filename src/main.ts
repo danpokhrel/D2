@@ -9,7 +9,10 @@ message.textContent = "Click and drag to draw!";
 const buttonGroup = document.createElement("div");
 
 const CANVAS_WIDTH = 1000;
-const CANVAS_HEIGHT = 600;
+const CANVAS_HEIGHT = 500;
+const _CANVAS_BG_COLOR = "hsl(0, 0%, 75%)";
+
+const MOUSE_BUTTON_LIST = ["", "L", "R", "LR", "M", "LM", "MR", "LMR"];
 
 /*
  * A lot of this beginning structure was paraphrased from the QuantPaint assignment.
@@ -33,28 +36,52 @@ interface mouseData {
   x: number;
   y: number;
   clicked: boolean;
+  clickType: string;
 }
-const mouse: mouseData = { x: 0, y: 0, clicked: false };
+const mouse: mouseData = { x: 0, y: 0, clicked: false, clickType: "" };
 
+canvas.addEventListener("contextmenu", (d) => {
+  d.preventDefault();
+});
 canvas.addEventListener("mousedown", GetMouseData);
 canvas.addEventListener("mouseup", (d) => {
   GetMouseData(d);
   if (newLine.length > 1) lineList.push(newLine.slice());
   newLine.splice(0);
-  DrawLines();
+  DrawAll();
   redoPile.splice(0);
 });
 
 canvas.addEventListener("mousemove", (d) => {
-  Draw(d);
-  CreateLineSeg(d);
+  switch (mouse.clickType) {
+    case ("L"):
+      Draw(d);
+      CreateLineSeg(d);
+      break;
+
+    case ("R"):
+      Erase(d);
+      break;
+
+    default:
+      break;
+  }
 });
 canvas.addEventListener("mouseenter", GetMouseData);
 
 function GetMouseData(data: MouseEvent) {
   mouse.x = data.offsetX;
   mouse.y = data.offsetY;
-  mouse.clicked = data.buttons == 1; // If left click specifically is pressed
+  mouse.clicked = data.buttons != 0;
+  mouse.clickType = MOUSE_BUTTON_LIST[data.buttons];
+  /* L = 1
+   * R = 2
+   * L+R = 3
+   * M = 4
+   * L+M = 5
+   * M+R = 6
+   * L+M+R = 7
+   */
   // console.log("Button pressed: " + data.buttons);
 }
 
@@ -66,7 +93,10 @@ interface lineSegment {
 const newLine: lineSegment[] = [];
 function CreateLineSeg(data: MouseEvent) {
   if (mouse.clicked == true) {
-    newLine.push({ x: mouse.x, y: mouse.y });
+    newLine.push({
+      x: mouse.x,
+      y: mouse.y,
+    });
     GetMouseData(data);
   }
 }
@@ -85,7 +115,7 @@ function Draw(data: MouseEvent) {
   GetMouseData(data);
 }
 
-function DrawLines() {
+function DrawAll() {
   Clear();
   console.log(lineList);
 
@@ -98,6 +128,10 @@ function DrawLines() {
     }
     context.stroke();
   }
+}
+
+function Erase(_data: MouseEvent) {
+  console.log("Look, I do something!");
 }
 
 function Clear() {
@@ -118,7 +152,7 @@ function Undo() {
   if (lastLine != undefined) {
     redoPile.push(lastLine);
   }
-  DrawLines();
+  DrawAll();
 }
 
 function Redo() {
@@ -126,7 +160,7 @@ function Redo() {
   if (lastLine != undefined) {
     lineList.push(lastLine);
   }
-  DrawLines();
+  DrawAll();
 }
 
 const clearButt = document.createElement("button");
@@ -144,4 +178,4 @@ redoButt.textContent = "Redo";
 redoButt.addEventListener("click", Redo);
 buttonGroup.append(redoButt);
 
-app.append(heading, message, canvas, buttonGroup);
+app.append(heading, message, buttonGroup, canvas);
