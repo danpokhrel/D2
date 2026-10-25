@@ -26,6 +26,8 @@ const context = canvas.getContext("2d")!;
 context.lineWidth = 4;
 context.lineCap = "round";
 
+const lineList: lineSegment[][] = []; // A list of line segment lists
+
 interface mouseData {
   x: number;
   y: number;
@@ -34,9 +36,17 @@ interface mouseData {
 const mouse: mouseData = { x: 0, y: 0, clicked: false };
 
 canvas.addEventListener("mousedown", GetMouseData);
-canvas.addEventListener("mouseup", GetMouseData);
+canvas.addEventListener("mouseup", (d) => {
+  GetMouseData(d);
+  if (newLine.length > 1) lineList.push(newLine.slice());
+  newLine.splice(0);
+  DrawLines();
+});
 
-canvas.addEventListener("mousemove", Draw);
+canvas.addEventListener("mousemove", (d) => {
+  Draw(d);
+  CreateLineSeg(d);
+});
 canvas.addEventListener("mouseenter", GetMouseData);
 
 function GetMouseData(data: MouseEvent) {
@@ -46,14 +56,46 @@ function GetMouseData(data: MouseEvent) {
   // console.log("Button pressed: " + data.buttons);
 }
 
+interface lineSegment {
+  x: number;
+  y: number;
+}
+
+const newLine: lineSegment[] = [];
+function CreateLineSeg(data: MouseEvent) {
+  if (mouse.clicked == true) {
+    newLine.push({ x: mouse.x, y: mouse.y });
+    GetMouseData(data);
+  }
+}
+
 function Draw(data: MouseEvent) {
   if (mouse.clicked == true) {
     context.beginPath();
     context.moveTo(mouse.x, mouse.y);
     context.lineTo(data.offsetX, data.offsetY);
     context.stroke();
+    // console.log(
+    //   "mouse: (" + mouse.x + ", " + mouse.y + ") | data: (" + data.offsetX +
+    //     ", " + data.offsetY + ")",
+    // );
   }
   GetMouseData(data);
+}
+
+function DrawLines() {
+  Clear();
+  console.log(lineList);
+
+  for (const line of lineList) {
+    context.beginPath();
+    context.moveTo(line[0].x, line[0].y);
+    for (const { x, y } of line) {
+      // console.log("\tCurrent Point:  (" + x + ", " + y + ")");
+      context.lineTo(x, y);
+    }
+    context.stroke();
+  }
 }
 
 const clearButt = document.createElement("button");

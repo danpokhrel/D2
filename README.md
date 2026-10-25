@@ -18,4 +18,4 @@ Tooling adapted from the [CMPM 121 Fall 2026 D1 starter](https://github.com/ucsc
 
 ## Notes
 
-- Serena: I just added basic drawing functionality. Next Imma work on getting it to stop drawing when the mouse goes of the canvas, as specified in the assignment doc. I'm basically just following that doc for now.
+- Serena: I made it so that the drawing doesn't jump when the mouse leaves and returns to the canvas. I've layed the groundwork for the undo feature by making it so that the drawings are stored in a list and redrawn as a group.
