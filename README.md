@@ -17,5 +17,3 @@ Tooling adapted from the [CMPM 121 Fall 2026 D1 starter](https://github.com/ucsc
 - [Github Pages Deployment](https://danpokhrel.github.io/D2/)
 
 ## Notes
-
-- Serena: I made it so that the drawing doesn't jump when the mouse leaves and returns to the canvas. I've layed the groundwork for the undo feature by making it so that the drawings are stored in a list and redrawn as a group.
