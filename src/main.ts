@@ -27,6 +27,7 @@ context.lineWidth = 4;
 context.lineCap = "round";
 
 const lineList: lineSegment[][] = []; // A list of line segment lists
+const redoPile: lineSegment[][] = [];
 
 interface mouseData {
   x: number;
@@ -41,6 +42,7 @@ canvas.addEventListener("mouseup", (d) => {
   if (newLine.length > 1) lineList.push(newLine.slice());
   newLine.splice(0);
   DrawLines();
+  redoPile.splice(0);
 });
 
 canvas.addEventListener("mousemove", (d) => {
@@ -98,13 +100,48 @@ function DrawLines() {
   }
 }
 
-const clearButt = document.createElement("button");
-clearButt.textContent = "Erase All";
-clearButt.addEventListener("click", Clear);
-buttonGroup.append(clearButt);
-
 function Clear() {
   context.clearRect(0, 0, canvas.width, canvas.height);
 }
+
+function EraseAll() {
+  Clear();
+  redoPile.splice(0);
+  for (const line of lineList) {
+    redoPile.push(line);
+  }
+  lineList.splice(0);
+}
+
+function Undo() {
+  const lastLine = lineList.pop();
+  if (lastLine != undefined) {
+    redoPile.push(lastLine);
+  }
+  DrawLines();
+}
+
+function Redo() {
+  const lastLine = redoPile.pop();
+  if (lastLine != undefined) {
+    lineList.push(lastLine);
+  }
+  DrawLines();
+}
+
+const clearButt = document.createElement("button");
+clearButt.textContent = "Erase All";
+clearButt.addEventListener("click", EraseAll);
+buttonGroup.append(clearButt);
+
+const undoButt = document.createElement("button");
+undoButt.textContent = "Undo";
+undoButt.addEventListener("click", Undo);
+buttonGroup.append(undoButt);
+
+const redoButt = document.createElement("button");
+redoButt.textContent = "Redo";
+redoButt.addEventListener("click", Redo);
+buttonGroup.append(redoButt);
 
 app.append(heading, message, canvas, buttonGroup);
