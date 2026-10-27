@@ -84,7 +84,7 @@ function Draw(data: MouseEvent) {
 }
 
 function DrawLines() {
-  Clear();
+  context.clearRect(0, 0, canvas.width, canvas.height);
   console.log(lineList);
 
   for (const line of lineList) {
@@ -105,6 +105,7 @@ buttonGroup.append(clearButt);
 
 function Clear() {
   context.clearRect(0, 0, canvas.width, canvas.height);
+  lineList.length = 0;
 }
 
 app.append(heading, message, canvas, buttonGroup);
