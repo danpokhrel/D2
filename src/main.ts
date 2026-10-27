@@ -27,6 +27,7 @@ context.lineWidth = 4;
 context.lineCap = "round";
 
 const lineList: lineSegment[][] = []; // A list of line segment lists
+const redoList: lineSegment[][] = []; // Line segments that were removed by undone
 
 interface mouseData {
   x: number;
@@ -41,6 +42,7 @@ canvas.addEventListener("mouseup", (d) => {
   if (newLine.length > 1) lineList.push(newLine.slice());
   newLine.splice(0);
   DrawLines();
+  clearRedoList();
 });
 
 canvas.addEventListener("mousemove", (d) => {
@@ -103,9 +105,38 @@ clearButt.textContent = "Erase All";
 clearButt.addEventListener("click", Clear);
 buttonGroup.append(clearButt);
 
+const undoButt = document.createElement("button");
+undoButt.textContent = "Undo";
+undoButt.addEventListener("click", Undo);
+buttonGroup.append(undoButt);
+
+const redoButt = document.createElement("button");
+redoButt.textContent = "Redo";
+redoButt.addEventListener("click", Redo);
+buttonGroup.append(redoButt);
+
+function Redo() {
+  if (redoList.length > 0) {
+    lineList.push(redoList.pop()!);
+    DrawLines();
+  }
+}
+
+function Undo() {
+  if (lineList.length > 0) {
+    redoList.push(lineList.pop()!);
+    DrawLines();
+  }
+}
+
+function clearRedoList() {
+  redoList.length = 0;
+}
+
 function Clear() {
   context.clearRect(0, 0, canvas.width, canvas.height);
   lineList.length = 0;
+  clearRedoList();
 }
 
 app.append(heading, message, canvas, buttonGroup);
