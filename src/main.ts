@@ -42,7 +42,7 @@ context.lineWidth = 4;
 context.lineCap = "round";
 
 const lineList: lineSegment[][] = []; // A list of line segment lists
-const redoPile: lineSegment[][] = [];
+const redoList: lineSegment[][] = []; // Line segments that were removed by undone
 
 interface mouseData {
   x: number;
@@ -62,8 +62,8 @@ canvas.addEventListener("mouseup", (d) => {
   GetMouseData(d);
   if (newLine.length > 1) lineList.push(newLine.slice());
   newLine.splice(0);
-  DrawAll();
-  redoPile.splice(0);
+  DrawLines();
+  clearRedoList();
 });
 
 canvas.addEventListener("mousemove", (d) => {
@@ -74,7 +74,7 @@ canvas.addEventListener("mousemove", (d) => {
       break;
 
     case ("R"):
-      Erase(d);
+      console.log("Right click!");
       break;
 
     default:
@@ -133,8 +133,8 @@ function Draw(data: MouseEvent) {
   GetMouseData(data);
 }
 
-function DrawAll() {
-  Clear();
+function DrawLines() {
+  ClearScreen();
   console.log(lineList);
 
   for (const line of lineList) {
@@ -149,37 +149,50 @@ function DrawAll() {
   }
 }
 
-function Erase(_data: MouseEvent) {
-  console.log("Look, I do something!");
-}
+const clearButt = document.createElement("button");
+clearButt.textContent = "Erase All";
+clearButt.addEventListener("click", EraseScreen);
+buttonGroup.append(clearButt);
 
-function Clear() {
-  context.clearRect(0, 0, canvas.width, canvas.height);
-}
+const undoButt = document.createElement("button");
+undoButt.textContent = "Undo";
+undoButt.addEventListener("click", Undo);
+buttonGroup.append(undoButt);
 
-function EraseAll() {
-  Clear();
-  redoPile.splice(0);
-  for (const line of lineList) {
-    redoPile.push(line);
+const redoButt = document.createElement("button");
+redoButt.textContent = "Redo";
+redoButt.addEventListener("click", Redo);
+buttonGroup.append(redoButt);
+
+function Redo() {
+  if (redoList.length > 0) {
+    lineList.push(redoList.pop()!);
+    DrawLines();
   }
-  lineList.splice(0);
 }
 
 function Undo() {
-  const lastLine = lineList.pop();
-  if (lastLine != undefined) {
-    redoPile.push(lastLine);
+  if (lineList.length > 0) {
+    redoList.push(lineList.pop()!);
+    DrawLines();
   }
-  DrawAll();
 }
 
-function Redo() {
-  const lastLine = redoPile.pop();
-  if (lastLine != undefined) {
-    lineList.push(lastLine);
+function clearRedoList() {
+  redoList.splice(0);
+}
+
+function ClearScreen() {
+  context.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function EraseScreen() {
+  ClearScreen();
+  clearRedoList();
+  for (const line of lineList) {
+    redoList.push(line);
   }
-  DrawAll();
+  lineList.splice(0);
 }
 
 // https://www.totaltypescript.com/concepts/type-string-cannot-be-used-to-index-type#solution-1-tighten-the-index
@@ -197,22 +210,6 @@ function ChangeColor(newColor: keyof typeof COLOR_DICT) {
   colorIndicator.textContent = "Current color: " + newColor;
   console.log("Changed color to " + newColor + " [" + penColor + "]");
 }
-
-//Control buttons
-const clearButt = document.createElement("button");
-clearButt.textContent = "Erase All";
-clearButt.addEventListener("click", EraseAll);
-buttonGroup.append(clearButt);
-
-const undoButt = document.createElement("button");
-undoButt.textContent = "Undo";
-undoButt.addEventListener("click", Undo);
-buttonGroup.append(undoButt);
-
-const redoButt = document.createElement("button");
-redoButt.textContent = "Redo";
-redoButt.addEventListener("click", Redo);
-buttonGroup.append(redoButt);
 
 // Color buttons
 const colorGroup = document.createElement("div");
