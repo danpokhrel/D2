@@ -41,6 +41,8 @@ const context = canvas.getContext("2d")!;
 // Pen Settings
 let penColor: string = COLOR_DICT.black;
 let penSize: number = 4;
+const PEN_SIZE_MAX: number = 15;
+const PEN_SIZE_MIN: number = 1;
 
 context.lineCap = "round";
 context.lineWidth = penSize;
@@ -55,6 +57,14 @@ interface mouseData {
   clickType: string;
 }
 const mouse: mouseData = { x: 0, y: 0, clicked: false, clickType: "" };
+
+function clamp(value: number, min: number, max: number) {
+  if (max <= min) {
+    throw new RangeError("max value should be larger than min!");
+  }
+
+  return (Math.max(min, Math.min(max, value)));
+}
 
 //https://coreui.io/blog/how-to-disable-right-click-on-a-website-using-javascript/
 canvas.addEventListener("contextmenu", (d) => {
@@ -250,9 +260,13 @@ for (const color in COLOR_DICT) {
 toolsGroup.append(colorGroup);
 
 // Pen Size Section
-function SetPenSize(newSize: number) {
+function SetPenSize(newSize: number, constrained: boolean = true) {
+  if (constrained == true) {
+    newSize = clamp(newSize, PEN_SIZE_MIN, PEN_SIZE_MAX);
+  }
+
   penSize = newSize;
-  context.lineWidth = penSize;
+  UpdateSizeMeter();
 }
 
 const sizeGroup = document.createElement("div");
@@ -270,6 +284,21 @@ sizeMinusButt.addEventListener("click", () => {
 });
 
 sizeGroup.append(sizePlusButt, sizeMinusButt);
+
+const sizeMeter = document.createElement("meter");
+sizeMeter.min = PEN_SIZE_MIN - 1;
+sizeMeter.max = PEN_SIZE_MAX;
+sizeGroup.append(sizeMeter);
+
+const sizeLabel = document.createElement("text");
+sizeGroup.append(sizeLabel);
+
+UpdateSizeMeter();
+
+function UpdateSizeMeter() {
+  sizeMeter.value = penSize;
+  sizeLabel.textContent = ` [Pen size: ${penSize}] `;
+}
 
 toolsGroup.append(sizeGroup);
 
