@@ -38,8 +38,12 @@ canvas.height = CANVAS_HEIGHT;
 
 const context = canvas.getContext("2d")!;
 
-context.lineWidth = 4;
+// Pen Settings
+let penColor: string = COLOR_DICT.black;
+let penSize: number = 4;
+
 context.lineCap = "round";
+context.lineWidth = penSize;
 
 const lineList: lineSegment[][] = []; // A list of line segment lists
 const redoList: lineSegment[][] = []; // Line segments that were removed by undone
@@ -103,16 +107,17 @@ interface lineSegment {
   x: number;
   y: number;
   color: string;
+  size: number;
 }
 
 const newLine: lineSegment[] = [];
-let penColor: string = COLOR_DICT.black;
 function CreateLineSeg(data: MouseEvent) {
   if (mouse.clicked == true) {
     newLine.push({
       x: mouse.x,
       y: mouse.y,
       color: context.strokeStyle.toString(),
+      size: penSize,
     });
     GetMouseData(data);
   }
@@ -124,6 +129,7 @@ function Draw(data: MouseEvent) {
     context.moveTo(mouse.x, mouse.y);
     context.lineTo(data.offsetX, data.offsetY);
     context.strokeStyle = penColor;
+    context.lineWidth = penSize;
     context.stroke();
     // console.log(
     //   "mouse: (" + mouse.x + ", " + mouse.y + ") | data: (" + data.offsetX +
@@ -145,6 +151,7 @@ function DrawLines() {
       context.lineTo(x, y);
     }
     context.strokeStyle = line[0].color;
+    context.lineWidth = line[0].size;
     context.stroke();
   }
 }
@@ -182,18 +189,24 @@ function clearRedoList() {
   redoList.splice(0);
 }
 
+// This one just clears the screen visually so it can be re-drawn
 function ClearScreen() {
   context.clearRect(0, 0, canvas.width, canvas.height);
 }
 
+// This one actualy clears the line list and redo history to get rid of everything
 function EraseScreen() {
   ClearScreen();
   clearRedoList();
-  for (const line of lineList) {
-    redoList.push(line);
-  }
+  // for (const line of lineList) {
+  //   redoList.push(line);
+  // }
   lineList.splice(0);
 }
+
+const toolsGroup = document.createElement("div");
+
+// Pen Color Section
 
 // https://www.totaltypescript.com/concepts/type-string-cannot-be-used-to-index-type#solution-1-tighten-the-index
 function ChangeColor(newColor: keyof typeof COLOR_DICT) {
@@ -211,7 +224,6 @@ function ChangeColor(newColor: keyof typeof COLOR_DICT) {
   console.log("Changed color to " + newColor + " [" + penColor + "]");
 }
 
-// Color buttons
 const colorGroup = document.createElement("div");
 
 const colorIndicator = document.createElement("p");
@@ -235,4 +247,30 @@ for (const color in COLOR_DICT) {
   colorGroup.append(colorButt);
 }
 
-app.append(message, buttonGroup, colorGroup, canvas);
+toolsGroup.append(colorGroup);
+
+// Pen Size Section
+function SetPenSize(newSize: number) {
+  penSize = newSize;
+  context.lineWidth = penSize;
+}
+
+const sizeGroup = document.createElement("div");
+
+const sizePlusButt = document.createElement("button");
+sizePlusButt.textContent = "Pen size up";
+sizePlusButt.addEventListener("click", () => {
+  SetPenSize(penSize + 1);
+});
+
+const sizeMinusButt = document.createElement("button");
+sizeMinusButt.textContent = "Pen size down";
+sizeMinusButt.addEventListener("click", () => {
+  SetPenSize(penSize - 1);
+});
+
+sizeGroup.append(sizePlusButt, sizeMinusButt);
+
+toolsGroup.append(sizeGroup);
+
+app.append(message, buttonGroup, toolsGroup, canvas);
