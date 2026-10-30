@@ -6,6 +6,15 @@ const app = document.querySelector<HTMLElement>("#app")!;
 const message = document.createElement("p");
 message.textContent = "Click and drag to draw!";
 
+const svgCanvas = document.getElementById("svgCanvas")!;
+console.log(svgCanvas.getAttributeNames());
+svgCanvas.setAttribute("width", "10");
+svgCanvas.setAttribute("height", "10");
+svgCanvas.setAttribute("viewBox", "0 0 10 10");
+svgCanvas.setAttribute("role", "img");
+svgCanvas.setAttribute("aria-label", "Test");
+// app.append(svgCanvas);
+
 const buttonGroup = document.createElement("div");
 
 const CANVAS_WIDTH = 1000;
@@ -13,6 +22,9 @@ const CANVAS_HEIGHT = 500;
 const _CANVAS_BG_COLOR = "hsl(0, 0%, 75%)";
 
 const MOUSE_BUTTON_LIST = ["", "L", "R", "LR", "M", "LM", "MR", "LMR"];
+const DRAW_BUTTON = MOUSE_BUTTON_LIST[1];
+const STICKER_BUTTON = MOUSE_BUTTON_LIST[2];
+
 const COLOR_DICT: Record<string, string> = {
   "black": "hsl(0, 0%, 0%)",
   "white": "hsl(0, 0%, 100%)",
@@ -25,6 +37,14 @@ const COLOR_DICT: Record<string, string> = {
   "purple": "hsl(260, 50%, 50%)",
   "pink": "hsl(300, 50%, 50%)",
 };
+const STICKER_LIST: string[] = CreateStickerList();
+
+const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+dot.setAttribute("cx", "3");
+dot.setAttribute("cy", "3");
+dot.setAttribute("r", "3");
+dot.setAttribute("fill", "#563b67");
+svgCanvas.append(dot);
 
 /*
  * A lot of this beginning structure was paraphrased from the QuantPaint assignment.
@@ -38,17 +58,25 @@ canvas.height = CANVAS_HEIGHT;
 
 const context = canvas.getContext("2d")!;
 
+canvas.append(svgCanvas);
+
 // Pen Settings
 let penColor: string = COLOR_DICT.black;
 let penSize: number = 15;
 const PEN_SIZE_MAX: number = 30;
 const PEN_SIZE_MIN: number = 1;
+// deno-lint-ignore prefer-const
+let _penShape: string = "circle";
+
+let curSticker: number = 0;
 
 context.lineCap = "round"; // "square" "round" "butt"
 context.lineWidth = penSize;
 
-const lineList: lineSegment[][] = []; // A list of line segment lists
-const redoList: lineSegment[][] = []; // Line segments that were removed by undone
+type canvasElement = lineSegment | stickerElement;
+
+const lineList: canvasElement[][] = []; // A list of canvasElement lists
+const redoList: canvasElement[][] = []; // Line segments that were removed by undone
 
 interface mouseData {
   x: number;
@@ -71,24 +99,52 @@ canvas.addEventListener("contextmenu", (d) => {
   d.preventDefault();
 });
 
-canvas.addEventListener("mousedown", GetMouseData);
-canvas.addEventListener("mouseup", (d) => {
+canvas.addEventListener("mousedown", (d) => {
   GetMouseData(d);
-  if (newLine.length > 1) lineList.push(newLine.slice());
-  newLine.splice(0);
-  DrawLines();
-  clearRedoList();
+
+  switch (mouse.clickType) {
+    case STICKER_BUTTON:
+      console.log("Right click!");
+      break;
+
+    default:
+      break;
+  }
+});
+canvas.addEventListener("mouseup", (d) => {
+  switch (mouse.clickType) {
+    case DRAW_BUTTON:
+      GetMouseData(d);
+      if (newLine.length > 1) lineList.push(newLine.slice());
+      newLine.splice(0);
+      DrawLines();
+      clearRedoList();
+      break;
+
+    case STICKER_BUTTON:
+      console.log("Right click released!");
+      GetMouseData(d);
+      CreateSticker();
+      DrawLines();
+      clearRedoList();
+      break;
+
+    default:
+      break;
+  }
 });
 
 canvas.addEventListener("mousemove", (d) => {
   switch (mouse.clickType) {
-    case ("L"):
+    case DRAW_BUTTON:
       Draw(d);
       CreateLineSeg(d);
       break;
 
-    case ("R"):
-      console.log("Right click!");
+    case STICKER_BUTTON:
+      console.log("Right click move!");
+      GetMouseData(d);
+      PreviewSticker();
       break;
 
     default:
@@ -110,25 +166,47 @@ function GetMouseData(data: MouseEvent) {
    * M+R = 6
    * L+M+R = 7
    */
+  // mouse.scrollDelta =
   // console.log("Button pressed: " + data.buttons);
 }
 
-interface lineSegment {
+// interface lineSegment {
+//   x: number;
+//   y: number;
+//   color: string;
+//   size: number;
+// }
+// https://www.reddit.com/r/typescript/comments/15n97m9/can_instanceof_operator_be_used_to_check_if_an/
+class lineSegment {
   x: number;
   y: number;
   color: string;
   size: number;
+
+  constructor(
+    x: number,
+    y: number,
+    color: string = penColor,
+    size: number = 1,
+  ) {
+    this.x = x;
+    this.y = y;
+    this.color = color;
+    this.size = size;
+  }
 }
 
 const newLine: lineSegment[] = [];
 function CreateLineSeg(data: MouseEvent) {
   if (mouse.clicked == true) {
-    newLine.push({
-      x: mouse.x,
-      y: mouse.y,
-      color: context.strokeStyle.toString(),
-      size: penSize,
-    });
+    newLine.push(
+      new lineSegment(
+        mouse.x,
+        mouse.y,
+        context.strokeStyle.toString(),
+        penSize,
+      ),
+    );
     GetMouseData(data);
   }
 }
@@ -153,16 +231,23 @@ function DrawLines() {
   ClearScreen();
   console.log(lineList);
 
-  for (const line of lineList) {
-    context.beginPath();
-    context.moveTo(line[0].x, line[0].y);
-    for (const { x, y } of line) {
-      // console.log("\tCurrent Point:  (" + x + ", " + y + ")");
-      context.lineTo(x, y);
+  for (const element of lineList) {
+    if (element[0] instanceof lineSegment) {
+      context.beginPath();
+      context.moveTo(element[0].x, element[0].y);
+      for (const { x, y } of element as lineSegment[]) {
+        // console.log("\tCurrent Point:  (" + x + ", " + y + ")");
+        context.lineTo(x, y);
+      }
+      context.strokeStyle = element[0].color;
+      context.lineWidth = element[0].size;
+      context.stroke();
+    } else if (element[0] instanceof stickerElement) {
+      for (const { x, y, img, size } of element as stickerElement[]) {
+        context.font = `${size}px serif`;
+        context.fillText(img, x, y);
+      }
     }
-    context.strokeStyle = line[0].color;
-    context.lineWidth = line[0].size;
-    context.stroke();
   }
 }
 
@@ -295,9 +380,6 @@ sizeMeter.addEventListener("input", () => {
   SetPenSize(Number(sizeMeter.value));
 });
 
-console.log(sizeMeter.getAttributeNames());
-console.log(sizeMeter.getAttribute("type"));
-
 sizeGroup.append(sizeMinusButt, sizeMeter, sizePlusButt);
 
 const sizeLabel = document.getElementById("sizeLabel")!;
@@ -311,5 +393,83 @@ function UpdateSizeIndication() {
 }
 
 toolsGroup.append(sizeGroup);
+
+// Sticker Section
+const stickerGroup = document.createElement("div");
+
+function CreateStickerList(): string[] {
+  const list: string[] = [];
+
+  // String.fromCodePoint() was discovered [here](view-source:https://www.base64.sh/js-unicode/) at line 593
+  for (let i = 0x1F600; i < 0x1F700; i++) {
+    // console.log(`\ti : ${i} : ${String.fromCodePoint(i)}`);
+    list.push(String.fromCodePoint(i));
+  }
+  return list;
+}
+
+class stickerElement {
+  x: number;
+  y: number;
+  img: string;
+  size: number;
+
+  constructor(
+    x: number,
+    y: number,
+    img: string = STICKER_LIST[curSticker],
+    size: number = 1,
+  ) {
+    this.x = x;
+    this.y = y;
+    this.img = img;
+    this.size = size;
+  }
+}
+
+function GetSticker(index: number = curSticker): string {
+  return (STICKER_LIST[index]);
+}
+
+function CreateSticker() {
+  const newSticker: stickerElement[] = [];
+  const stickerSize = clamp(penSize * 2, 10, 60);
+  newSticker.push(
+    new stickerElement(mouse.x, mouse.y, GetSticker(), stickerSize),
+  );
+  lineList.push(newSticker);
+}
+
+function PreviewSticker() {
+  DrawLines();
+  const stickerSize = clamp(penSize * 2, 10, 60);
+  context.font = `${stickerSize}px serif`;
+  context.fillText(GetSticker(), mouse.x, mouse.y);
+}
+
+const stickerPlusButt = document.createElement("button");
+stickerPlusButt.textContent = "Next sticker";
+stickerPlusButt.addEventListener("click", SelectNextsticker);
+stickerGroup.append(stickerPlusButt);
+
+function SelectNextsticker() {
+  curSticker++;
+}
+
+const stickerMinusButt = document.createElement("button");
+stickerMinusButt.textContent = "Previous sticker";
+stickerMinusButt.addEventListener("click", SelectPrevsticker);
+stickerGroup.append(stickerMinusButt);
+
+function SelectPrevsticker() {
+  curSticker--;
+}
+
+// deno-lint-ignore no-unused-vars
+function SelectSticker(index: number) {
+  curSticker = clamp(index, 0, STICKER_LIST.length);
+}
+
+toolsGroup.append(stickerGroup);
 
 app.append(message, buttonGroup, toolsGroup, canvas);
