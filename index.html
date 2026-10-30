@@ -9,16 +9,46 @@
       border: ridge black;
       border-width: 1vw;
       background-color: lightgrey;
+      cursor: "pointer";
     }
     </style>
   </head>
   <body>
-    <input type="range" id="penSize" name="penSize" min="1" max="15"
-      value="15" />
-    <label for="penSize" id="penSizeLabel">Pen Size</label>
-    <input type="range" id="stickerSize" min="1" max="15"
-      value="15" />
-    <label for="stickerSize" id="stickerSizeLabel">Sticker Size</label>
+    <p>Left click to draw, right light to place stickers!</p>
+
+    <div id="utilButtons">
+      <button id="clearButton">Erase All</button>
+      <button id="undoButton">Undo</button>
+      <button id="redoButton">Redo</button>
+    </div>
+
+    <div id="colorSettings">
+      <p id="colorLabel">Current color: rAiNbOw</p>
+      <div id="colorButtons"></div>
+    </div>
+
+    <div id="penSizeButtons">
+      <button id="penSizeMinus">-</button>
+      <input type="range" id="penSizeSlider" min="1" max="15"
+        value="15" />
+      <button id="penSizePlus">+</button>
+      <label for="penSize" id="penSizeLabel">Pen Size</label>
+    </div>
+
+    <div id="stickerButtons">
+      <button id="stickerSelectPrev"><</button>
+      <text id="stickerSelectLabel">:)</text>
+      <button id="stickerSelectNext">></button>
+
+      <button id="stickerSizeMinus">-</button>
+      <input type="range" id="stickerSizeSlider" min="1" max="15"
+        value="15" />
+      <button id="stickerSizePlus">+</button>
+      <label for="stickerSizeLabel" id="stickerSizeLabel">Sticker Size</label>
+    </div>
+
+    <canvas id="mainCanvas"></canvas>
+
     <main id="app"></main>
     <script type="module" src="/src/main.ts"></script>
   </body>

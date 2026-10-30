@@ -1,13 +1,5 @@
 const app = document.querySelector<HTMLElement>("#app")!;
 
-// const heading = document.createElement("h1");
-// heading.textContent = "D2 project";
-
-const message = document.createElement("p");
-message.textContent = "Click and drag to draw!";
-
-const buttonGroup = document.createElement("div");
-
 const CANVAS_WIDTH = 1000;
 const CANVAS_HEIGHT = 500;
 const _CANVAS_BG_COLOR = "hsl(0, 0%, 75%)";
@@ -15,6 +7,9 @@ const _CANVAS_BG_COLOR = "hsl(0, 0%, 75%)";
 const MOUSE_BUTTON_LIST = ["", "L", "R", "LR", "M", "LM", "MR", "LMR"];
 const DRAW_BUTTON = MOUSE_BUTTON_LIST[1];
 const STICKER_BUTTON = MOUSE_BUTTON_LIST[2];
+const CURSOR_DRAW = "pointer";
+const CURSOR_STICKER_ACTIVE = "grabbing";
+const CURSOR_STICKER_INACTIVE = "grab";
 
 const COLOR_DICT: Record<string, string> = {
   "black": "hsl(0, 0%, 0%)",
@@ -36,7 +31,7 @@ const STICKER_LIST: string[] = CreateStickerList();
  * The code was not directly copied, but some of it's logic and structure was used as reference.
  */
 
-const canvas = document.createElement("canvas");
+const canvas = document.getElementById("mainCanvas")! as HTMLCanvasElement;
 canvas.width = CANVAS_WIDTH;
 canvas.height = CANVAS_HEIGHT;
 
@@ -47,8 +42,6 @@ let penColor: string = COLOR_DICT.black;
 let penSize: number = 15;
 const PEN_SIZE_MAX: number = 30;
 const PEN_SIZE_MIN: number = 1;
-// deno-lint-ignore prefer-const
-let _penShape: string = "circle";
 
 let curSticker: number = 0;
 let stickerSize: number = 30;
@@ -88,11 +81,12 @@ canvas.addEventListener("mousedown", (d) => {
   GetMouseData(d);
 
   switch (mouse.clickType) {
-    case STICKER_BUTTON:
-      console.log("Right click!");
+    case DRAW_BUTTON:
+      ChangeCursor(CURSOR_DRAW);
       break;
-
-    default:
+    case STICKER_BUTTON:
+      ChangeCursor(CURSOR_STICKER_ACTIVE);
+      PreviewSticker();
       break;
   }
 });
@@ -107,7 +101,7 @@ canvas.addEventListener("mouseup", (d) => {
       break;
 
     case STICKER_BUTTON:
-      console.log("Right click released!");
+      ChangeCursor(CURSOR_STICKER_INACTIVE);
       GetMouseData(d);
       CreateSticker();
       DrawLines();
@@ -127,7 +121,6 @@ canvas.addEventListener("mousemove", (d) => {
       break;
 
     case STICKER_BUTTON:
-      console.log("Right click move!");
       GetMouseData(d);
       PreviewSticker();
       break;
@@ -151,16 +144,14 @@ function GetMouseData(data: MouseEvent) {
    * M+R = 6
    * L+M+R = 7
    */
-  // mouse.scrollDelta =
+
   // console.log("Button pressed: " + data.buttons);
 }
 
-// interface lineSegment {
-//   x: number;
-//   y: number;
-//   color: string;
-//   size: number;
-// }
+function ChangeCursor(newCursor: string) {
+  canvas.style.cursor = newCursor;
+}
+
 // https://www.reddit.com/r/typescript/comments/15n97m9/can_instanceof_operator_be_used_to_check_if_an/
 class lineSegment {
   x: number;
@@ -214,7 +205,6 @@ function Draw(data: MouseEvent) {
 
 function DrawLines() {
   ClearScreen();
-  console.log(lineList);
 
   for (const element of lineList) {
     if (element[0] instanceof lineSegment) {
@@ -236,20 +226,17 @@ function DrawLines() {
   }
 }
 
-const clearButt = document.createElement("button");
+const clearButt = document.getElementById("clearButton")! as HTMLButtonElement;
 clearButt.textContent = "Erase All";
 clearButt.addEventListener("click", EraseScreen);
-buttonGroup.append(clearButt);
 
-const undoButt = document.createElement("button");
+const undoButt = document.getElementById("undoButton")! as HTMLButtonElement;
 undoButt.textContent = "Undo";
 undoButt.addEventListener("click", Undo);
-buttonGroup.append(undoButt);
 
-const redoButt = document.createElement("button");
+const redoButt = document.getElementById("redoButton")! as HTMLButtonElement;
 redoButt.textContent = "Redo";
 redoButt.addEventListener("click", Redo);
-buttonGroup.append(redoButt);
 
 function Redo() {
   if (redoList.length > 0) {
@@ -284,9 +271,13 @@ function EraseScreen() {
   lineList.splice(0);
 }
 
-const toolsGroup = document.createElement("div");
-
+//
+//
+//
 // Pen Color Section
+//
+//
+//
 
 // https://www.totaltypescript.com/concepts/type-string-cannot-be-used-to-index-type#solution-1-tighten-the-index
 function ChangeColor(newColor: keyof typeof COLOR_DICT) {
@@ -308,9 +299,9 @@ function UpdateColorInidication(colorName: string) {
   colorIndicator.textContent = "Current color: " + colorName;
 }
 
-const colorGroup = document.createElement("div");
+const colorGroup = document.getElementById("colorButtons")!;
 
-const colorIndicator = document.createElement("p");
+const colorIndicator = document.getElementById("colorLabel")!;
 UpdateColorInidication("black");
 
 colorGroup.append(colorIndicator);
@@ -331,9 +322,14 @@ for (const color in COLOR_DICT) {
   colorGroup.append(colorButt);
 }
 
-toolsGroup.append(colorGroup);
-
+//
+//
+//
 // Pen Size Section
+//
+//
+//
+
 function SetPenSize(newSize: number, constrained: boolean = true) {
   if (constrained == true) {
     newSize = clamp(newSize, PEN_SIZE_MIN, PEN_SIZE_MAX);
@@ -343,22 +339,26 @@ function SetPenSize(newSize: number, constrained: boolean = true) {
   UpdateSizeIndication();
 }
 
-const sizeGroup = document.createElement("div");
+const sizeGroup = document.getElementById("penSizeButtons")!;
 
-const penSizePlusButt = document.createElement("button");
+const penSizePlusButt = document.getElementById(
+  "penSizePlus",
+)! as HTMLButtonElement;
 penSizePlusButt.textContent = "+";
 penSizePlusButt.addEventListener("click", () => {
   SetPenSize(penSize + 1);
 });
 
-const penSizeMinusButt = document.createElement("button");
+const penSizeMinusButt = document.getElementById(
+  "penSizeMinus",
+)! as HTMLButtonElement;
 penSizeMinusButt.textContent = "-";
 penSizeMinusButt.addEventListener("click", () => {
   SetPenSize(penSize - 1);
 });
 
 // Thanks Babboy Had: https://bobbyhadz.com/blog/typescript-property-value-not-exist-type-htmlelement#use-a-type-assertion-to-solve-the-error
-const sizeMeter = document.getElementById("penSize")! as HTMLInputElement;
+const sizeMeter = document.getElementById("penSizeSlider")! as HTMLInputElement;
 sizeMeter.setAttribute("max", `${PEN_SIZE_MAX}`);
 sizeMeter.setAttribute("min", `${PEN_SIZE_MIN}`);
 sizeMeter.addEventListener("input", () => {
@@ -377,15 +377,20 @@ function UpdateSizeIndication() {
   penSizeLabel.textContent = ` [Pen size: ${penSize}] `;
 }
 
-toolsGroup.append(sizeGroup);
-
+//
+//
+//
 // Sticker Section
-const stickerGroup = document.createElement("div");
+//
+//
+//
+
+const stickerGroup = document.getElementById("stickerButtons")!;
 
 function CreateStickerList(): string[] {
   const list: string[] = [];
 
-  // String.fromCodePoint() was discovered [here](view-source:https://www.base64.sh/js-unicode/) at line 593
+  // String.fromCodePoint() was inspired by [this](view-source:https://www.base64.sh/js-unicode/) at line 593
   for (let i = 0x1F600; i < 0x1F6FD; i++) {
     // console.log(`\ti : ${i} : ${String.fromCodePoint(i)}`);
     list.push(String.fromCodePoint(i));
@@ -439,7 +444,9 @@ function PreviewSticker() {
   );
 }
 
-const stickerPlusButt = document.createElement("button");
+const stickerPlusButt = document.getElementById(
+  "stickerSelectNext",
+)! as HTMLButtonElement;
 stickerPlusButt.textContent = ">";
 stickerPlusButt.addEventListener("click", SelectNextsticker);
 
@@ -449,7 +456,9 @@ function SelectNextsticker() {
   UpdateStickerIndication();
 }
 
-const stickerMinusButt = document.createElement("button");
+const stickerMinusButt = document.getElementById(
+  "stickerSelectPrev",
+)! as HTMLButtonElement;
 stickerMinusButt.textContent = "<";
 stickerMinusButt.addEventListener("click", SelectPrevsticker);
 
@@ -459,10 +468,8 @@ function SelectPrevsticker() {
   UpdateStickerIndication();
 }
 
-const stickerLabel = document.createElement("text");
+const stickerLabel = document.getElementById("stickerSelectLabel")!;
 stickerLabel.textContent = GetSticker();
-
-stickerGroup.append(stickerMinusButt, stickerLabel, stickerPlusButt);
 
 // deno-lint-ignore no-unused-vars
 function SelectSticker(index: number) {
@@ -472,7 +479,7 @@ function SelectSticker(index: number) {
 
 // Thanks Babboy Had: https://bobbyhadz.com/blog/typescript-property-value-not-exist-type-htmlelement#use-a-type-assertion-to-solve-the-error
 const stickerSizeMeter = document.getElementById(
-  "stickerSize",
+  "stickerSizeSlider",
 )! as HTMLInputElement;
 stickerSizeMeter.setAttribute("max", `${STICKER_SIZE_MAX}`);
 stickerSizeMeter.setAttribute("min", `${STICKER_SIZE_MIN}`);
@@ -481,13 +488,17 @@ stickerSizeMeter.addEventListener("input", () => {
   UpdateStickerIndication();
 });
 
-const stickerSizePlusButt = document.createElement("button");
+const stickerSizePlusButt = document.getElementById(
+  "stickerSizePlus",
+)! as HTMLButtonElement;
 stickerSizePlusButt.textContent = "+";
 stickerSizePlusButt.addEventListener("click", () => {
   SetStickerSize(stickerSize + 1);
 });
 
-const stickerSizeMinusButt = document.createElement("button");
+const stickerSizeMinusButt = document.getElementById(
+  "stickerSizeMinus",
+)! as HTMLButtonElement;
 stickerSizeMinusButt.textContent = "-";
 stickerSizeMinusButt.addEventListener("click", () => {
   SetStickerSize(stickerSize - 1);
@@ -518,6 +529,4 @@ function UpdateStickerIndication() {
 }
 UpdateStickerIndication();
 
-toolsGroup.append(stickerGroup);
-
-app.append(message, buttonGroup, toolsGroup, canvas);
+app.append();
