@@ -6,15 +6,6 @@ const app = document.querySelector<HTMLElement>("#app")!;
 const message = document.createElement("p");
 message.textContent = "Click and drag to draw!";
 
-const svgCanvas = document.getElementById("svgCanvas")!;
-console.log(svgCanvas.getAttributeNames());
-svgCanvas.setAttribute("width", "10");
-svgCanvas.setAttribute("height", "10");
-svgCanvas.setAttribute("viewBox", "0 0 10 10");
-svgCanvas.setAttribute("role", "img");
-svgCanvas.setAttribute("aria-label", "Test");
-// app.append(svgCanvas);
-
 const buttonGroup = document.createElement("div");
 
 const CANVAS_WIDTH = 1000;
@@ -39,13 +30,6 @@ const COLOR_DICT: Record<string, string> = {
 };
 const STICKER_LIST: string[] = CreateStickerList();
 
-const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-dot.setAttribute("cx", "3");
-dot.setAttribute("cy", "3");
-dot.setAttribute("r", "3");
-dot.setAttribute("fill", "#563b67");
-svgCanvas.append(dot);
-
 /*
  * A lot of this beginning structure was paraphrased from the QuantPaint assignment.
  * https://github.com/rndmcnlly/cmpm-121-f25-quaint-paint/blob/main/paint0.html
@@ -58,8 +42,6 @@ canvas.height = CANVAS_HEIGHT;
 
 const context = canvas.getContext("2d")!;
 
-canvas.append(svgCanvas);
-
 // Pen Settings
 let penColor: string = COLOR_DICT.black;
 let penSize: number = 15;
@@ -69,6 +51,9 @@ const PEN_SIZE_MIN: number = 1;
 let _penShape: string = "circle";
 
 let curSticker: number = 0;
+let stickerSize: number = 30;
+const STICKER_SIZE_MAX = 120;
+const STICKER_SIZE_MIN = 10;
 
 context.lineCap = "round"; // "square" "round" "butt"
 context.lineWidth = penSize;
@@ -360,15 +345,15 @@ function SetPenSize(newSize: number, constrained: boolean = true) {
 
 const sizeGroup = document.createElement("div");
 
-const sizePlusButt = document.createElement("button");
-sizePlusButt.textContent = "+";
-sizePlusButt.addEventListener("click", () => {
+const penSizePlusButt = document.createElement("button");
+penSizePlusButt.textContent = "+";
+penSizePlusButt.addEventListener("click", () => {
   SetPenSize(penSize + 1);
 });
 
-const sizeMinusButt = document.createElement("button");
-sizeMinusButt.textContent = "-";
-sizeMinusButt.addEventListener("click", () => {
+const penSizeMinusButt = document.createElement("button");
+penSizeMinusButt.textContent = "-";
+penSizeMinusButt.addEventListener("click", () => {
   SetPenSize(penSize - 1);
 });
 
@@ -380,16 +365,16 @@ sizeMeter.addEventListener("input", () => {
   SetPenSize(Number(sizeMeter.value));
 });
 
-sizeGroup.append(sizeMinusButt, sizeMeter, sizePlusButt);
+sizeGroup.append(penSizeMinusButt, sizeMeter, penSizePlusButt);
 
-const sizeLabel = document.getElementById("sizeLabel")!;
-sizeGroup.append(sizeLabel);
+const penSizeLabel = document.getElementById("penSizeLabel")!;
+sizeGroup.append(penSizeLabel);
 
 UpdateSizeIndication();
 
 function UpdateSizeIndication() {
   sizeMeter.value = String(penSize);
-  sizeLabel.textContent = ` [Pen size: ${penSize}] `;
+  penSizeLabel.textContent = ` [Pen size: ${penSize}] `;
 }
 
 toolsGroup.append(sizeGroup);
@@ -401,7 +386,7 @@ function CreateStickerList(): string[] {
   const list: string[] = [];
 
   // String.fromCodePoint() was discovered [here](view-source:https://www.base64.sh/js-unicode/) at line 593
-  for (let i = 0x1F600; i < 0x1F700; i++) {
+  for (let i = 0x1F600; i < 0x1F6FD; i++) {
     // console.log(`\ti : ${i} : ${String.fromCodePoint(i)}`);
     list.push(String.fromCodePoint(i));
   }
@@ -433,42 +418,105 @@ function GetSticker(index: number = curSticker): string {
 
 function CreateSticker() {
   const newSticker: stickerElement[] = [];
-  const stickerSize = clamp(penSize * 2, 10, 60);
   newSticker.push(
-    new stickerElement(mouse.x, mouse.y, GetSticker(), stickerSize),
+    new stickerElement(
+      mouse.x - stickerSize / 2,
+      mouse.y + stickerSize / 2,
+      GetSticker(),
+      stickerSize,
+    ),
   );
   lineList.push(newSticker);
 }
 
 function PreviewSticker() {
   DrawLines();
-  const stickerSize = clamp(penSize * 2, 10, 60);
   context.font = `${stickerSize}px serif`;
-  context.fillText(GetSticker(), mouse.x, mouse.y);
+  context.fillText(
+    GetSticker(),
+    mouse.x - stickerSize / 2,
+    mouse.y + stickerSize / 2,
+  );
 }
 
 const stickerPlusButt = document.createElement("button");
-stickerPlusButt.textContent = "Next sticker";
+stickerPlusButt.textContent = ">";
 stickerPlusButt.addEventListener("click", SelectNextsticker);
-stickerGroup.append(stickerPlusButt);
 
 function SelectNextsticker() {
   curSticker++;
+  if (curSticker >= STICKER_LIST.length) curSticker = 0;
+  UpdateStickerIndication();
 }
 
 const stickerMinusButt = document.createElement("button");
-stickerMinusButt.textContent = "Previous sticker";
+stickerMinusButt.textContent = "<";
 stickerMinusButt.addEventListener("click", SelectPrevsticker);
-stickerGroup.append(stickerMinusButt);
 
 function SelectPrevsticker() {
   curSticker--;
+  if (curSticker < 0) curSticker = STICKER_LIST.length - 1;
+  UpdateStickerIndication();
 }
+
+const stickerLabel = document.createElement("text");
+stickerLabel.textContent = GetSticker();
+
+stickerGroup.append(stickerMinusButt, stickerLabel, stickerPlusButt);
 
 // deno-lint-ignore no-unused-vars
 function SelectSticker(index: number) {
-  curSticker = clamp(index, 0, STICKER_LIST.length);
+  curSticker = clamp(index, 0, STICKER_LIST.length - 1);
+  UpdateStickerIndication();
 }
+
+// Thanks Babboy Had: https://bobbyhadz.com/blog/typescript-property-value-not-exist-type-htmlelement#use-a-type-assertion-to-solve-the-error
+const stickerSizeMeter = document.getElementById(
+  "stickerSize",
+)! as HTMLInputElement;
+stickerSizeMeter.setAttribute("max", `${STICKER_SIZE_MAX}`);
+stickerSizeMeter.setAttribute("min", `${STICKER_SIZE_MIN}`);
+stickerSizeMeter.addEventListener("input", () => {
+  SetStickerSize(Number(stickerSizeMeter.value));
+  UpdateStickerIndication();
+});
+
+const stickerSizePlusButt = document.createElement("button");
+stickerSizePlusButt.textContent = "+";
+stickerSizePlusButt.addEventListener("click", () => {
+  SetStickerSize(stickerSize + 1);
+});
+
+const stickerSizeMinusButt = document.createElement("button");
+stickerSizeMinusButt.textContent = "-";
+stickerSizeMinusButt.addEventListener("click", () => {
+  SetStickerSize(stickerSize - 1);
+});
+
+const stickerSizeLabel = document.getElementById("stickerSizeLabel")!;
+stickerGroup.append(
+  stickerSizeMinusButt,
+  stickerSizeMeter,
+  stickerSizePlusButt,
+  stickerSizeLabel,
+);
+
+function SetStickerSize(newSize: number, useLimits: boolean = true) {
+  if (useLimits == true) {
+    newSize = clamp(newSize, STICKER_SIZE_MIN, STICKER_SIZE_MAX);
+  }
+
+  stickerSize = newSize;
+  UpdateStickerIndication();
+}
+
+function UpdateStickerIndication() {
+  stickerSizeMeter.value = String(stickerSize);
+  stickerSizeLabel.textContent = ` [Sticker Size: ${stickerSize}] `;
+
+  stickerLabel.textContent = GetSticker();
+}
+UpdateStickerIndication();
 
 toolsGroup.append(stickerGroup);
 
