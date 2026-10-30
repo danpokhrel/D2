@@ -40,11 +40,11 @@ const context = canvas.getContext("2d")!;
 
 // Pen Settings
 let penColor: string = COLOR_DICT.black;
-let penSize: number = 4;
-const PEN_SIZE_MAX: number = 15;
+let penSize: number = 15;
+const PEN_SIZE_MAX: number = 30;
 const PEN_SIZE_MIN: number = 1;
 
-context.lineCap = "round";
+context.lineCap = "round"; // "square" "round" "butt"
 context.lineWidth = penSize;
 
 const lineList: lineSegment[][] = []; // A list of line segment lists
@@ -272,31 +272,37 @@ function SetPenSize(newSize: number, constrained: boolean = true) {
 const sizeGroup = document.createElement("div");
 
 const sizePlusButt = document.createElement("button");
-sizePlusButt.textContent = "Pen size up";
+sizePlusButt.textContent = "+";
 sizePlusButt.addEventListener("click", () => {
   SetPenSize(penSize + 1);
 });
 
 const sizeMinusButt = document.createElement("button");
-sizeMinusButt.textContent = "Pen size down";
+sizeMinusButt.textContent = "-";
 sizeMinusButt.addEventListener("click", () => {
   SetPenSize(penSize - 1);
 });
 
-sizeGroup.append(sizePlusButt, sizeMinusButt);
+// Thanks Babboy Had: https://bobbyhadz.com/blog/typescript-property-value-not-exist-type-htmlelement#use-a-type-assertion-to-solve-the-error
+const sizeMeter = document.getElementById("penSize")! as HTMLInputElement;
+sizeMeter.setAttribute("max", `${PEN_SIZE_MAX}`);
+sizeMeter.setAttribute("min", `${PEN_SIZE_MIN}`);
+sizeMeter.addEventListener("input", () => {
+  SetPenSize(Number(sizeMeter.value));
+});
 
-const sizeMeter = document.createElement("meter");
-sizeMeter.min = PEN_SIZE_MIN - 1;
-sizeMeter.max = PEN_SIZE_MAX;
-sizeGroup.append(sizeMeter);
+console.log(sizeMeter.getAttributeNames());
+console.log(sizeMeter.getAttribute("type"));
 
-const sizeLabel = document.createElement("text");
+sizeGroup.append(sizeMinusButt, sizeMeter, sizePlusButt);
+
+const sizeLabel = document.getElementById("sizeLabel")!;
 sizeGroup.append(sizeLabel);
 
 UpdateSizeMeter();
 
 function UpdateSizeMeter() {
-  sizeMeter.value = penSize;
+  sizeMeter.value = String(penSize);
   sizeLabel.textContent = ` [Pen size: ${penSize}] `;
 }
 
