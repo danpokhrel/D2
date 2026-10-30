@@ -230,14 +230,18 @@ function ChangeColor(newColor: keyof typeof COLOR_DICT) {
   }
 
   penColor = COLOR_DICT[newColor];
-  colorIndicator.textContent = "Current color: " + newColor;
+  UpdateColorInidication(newColor);
   console.log("Changed color to " + newColor + " [" + penColor + "]");
+}
+
+function UpdateColorInidication(colorName: string) {
+  colorIndicator.textContent = "Current color: " + colorName;
 }
 
 const colorGroup = document.createElement("div");
 
 const colorIndicator = document.createElement("p");
-colorIndicator.textContent = "Current color:  black";
+UpdateColorInidication("black");
 
 colorGroup.append(colorIndicator);
 for (const color in COLOR_DICT) {
@@ -266,7 +270,7 @@ function SetPenSize(newSize: number, constrained: boolean = true) {
   }
 
   penSize = newSize;
-  UpdateSizeMeter();
+  UpdateSizeIndication();
 }
 
 const sizeGroup = document.createElement("div");
@@ -299,9 +303,9 @@ sizeGroup.append(sizeMinusButt, sizeMeter, sizePlusButt);
 const sizeLabel = document.getElementById("sizeLabel")!;
 sizeGroup.append(sizeLabel);
 
-UpdateSizeMeter();
+UpdateSizeIndication();
 
-function UpdateSizeMeter() {
+function UpdateSizeIndication() {
   sizeMeter.value = String(penSize);
   sizeLabel.textContent = ` [Pen size: ${penSize}] `;
 }
