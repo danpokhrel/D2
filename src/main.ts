@@ -39,6 +39,7 @@ const PEN_SIZE_MAX: number = 30;
 const PEN_SIZE_MIN: number = 1;
 const STICKER_SIZE_MAX = 120;
 const STICKER_SIZE_MIN = 10;
+const DEFAULT_BRUSH = "round";
 
 context.lineCap = "round"; // "square" "round" "butt"
 
@@ -56,8 +57,11 @@ const editor = {
   penSize: 15,
   curSticker: 0,
   stickerSize: 30,
+  brushName: DEFAULT_BRUSH,
   commandList: [] as CanvasElement[][],
   redoList: [] as CanvasElement[][],
+  customBrushes: [] as { name: string; elements: CanvasElement[] }[],
+  customCommands: new WeakSet<CanvasElement[]>(),
   mouse: { x: 0, y: 0, clicked: false, clickType: "" } as MouseData,
   addCommand(command: CanvasElement[]) {
     this.commandList.push(command);
@@ -79,6 +83,7 @@ const editor = {
   },
 };
 const newLine: LineSegment[] = [];
+const newBrushCommand: CanvasElement[] = [];
 context.lineWidth = editor.penSize;
 
 function clamp(value: number, min: number, max: number) {
@@ -147,8 +152,68 @@ const tools: Record<string, Tool> = {
   },
 };
 
+const customBrushTool: Tool = {
+  start() {
+    ChangeCursor(CURSOR_DRAW);
+    newBrushCommand.splice(0);
+  },
+  move(data) {
+    if (editor.mouse.clicked) {
+      AddCustomBrushStamp(editor.mouse.x, editor.mouse.y);
+      DrawLines();
+      RenderCommand(context, newBrushCommand, true);
+    }
+    GetMouseData(data);
+  },
+  end(data) {
+    GetMouseData(data);
+    if (newBrushCommand.length > 0) {
+      const command = newBrushCommand.slice();
+      editor.customCommands.add(command);
+      editor.addCommand(command);
+    }
+    newBrushCommand.splice(0);
+    DrawLines();
+  },
+};
+
 function GetActiveTool(): Tool | undefined {
+  if (
+    editor.mouse.clickType == DRAW_BUTTON &&
+    editor.brushName != DEFAULT_BRUSH
+  ) {
+    return customBrushTool;
+  }
   return tools[editor.mouse.clickType];
+}
+
+function AddCustomBrushStamp(x: number, y: number) {
+  const brush = editor.customBrushes.find((item) =>
+    item.name == editor.brushName
+  );
+  if (!brush) return;
+
+  for (const element of brush.elements) {
+    if (element instanceof LineSegment) {
+      newBrushCommand.push(
+        new LineSegment(
+          x + element.x,
+          y + element.y,
+          element.color,
+          element.size,
+        ),
+      );
+    } else {
+      newBrushCommand.push(
+        new StickerElement(
+          x + element.x,
+          y + element.y,
+          element.img,
+          element.size,
+        ),
+      );
+    }
+  }
 }
 
 function GetMouseData(data: MouseEvent) {
@@ -241,25 +306,124 @@ function RenderElements(
   target.setTransform(scale, 0, 0, scale, 0, 0);
   target.lineCap = "round";
   for (const element of editor.commandList) {
-    const first = element[0];
-    if (!first) continue;
+    RenderCommand(target, element);
+  }
+}
 
-    if (first instanceof LineSegment) {
-      target.beginPath();
-      target.moveTo(first.x, first.y);
-      for (const { x, y } of element as LineSegment[]) {
-        target.lineTo(x, y);
-      }
-      target.strokeStyle = first.color;
-      target.lineWidth = first.size;
-      target.stroke();
-    } else if (first instanceof StickerElement) {
-      for (const { x, y, img, size } of element as StickerElement[]) {
-        target.font = `${size}px serif`;
-        target.fillText(img, x, y);
+function RenderCommand(
+  target: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  element: CanvasElement[],
+  isCustomBrush = editor.customCommands.has(element),
+) {
+  if (isCustomBrush) {
+    for (const item of element) {
+      if (item instanceof LineSegment) {
+        target.beginPath();
+        target.arc(item.x, item.y, item.size / 2, 0, Math.PI * 2);
+        target.fillStyle = item.color;
+        target.fill();
+      } else {
+        target.font = `${item.size}px serif`;
+        target.fillText(item.img, item.x, item.y);
       }
     }
+    return;
   }
+
+  const first = element[0];
+  if (!first) return;
+
+  if (first instanceof LineSegment) {
+    target.beginPath();
+    target.moveTo(first.x, first.y);
+    for (const { x, y } of element as LineSegment[]) {
+      target.lineTo(x, y);
+    }
+    target.strokeStyle = first.color;
+    target.lineWidth = first.size;
+    target.stroke();
+  } else if (first instanceof StickerElement) {
+    for (const { x, y, img, size } of element as StickerElement[]) {
+      target.font = `${size}px serif`;
+      target.fillText(img, x, y);
+    }
+  }
+}
+
+function CloneBrushElements(): CanvasElement[] {
+  const elements = editor.commandList.flatMap((command) =>
+    command.map((element) => {
+      if (element instanceof LineSegment) {
+        return new LineSegment(
+          element.x,
+          element.y,
+          element.color,
+          element.size,
+        );
+      }
+      return new StickerElement(
+        element.x,
+        element.y,
+        element.img,
+        element.size,
+      );
+    })
+  );
+  if (elements.length == 0) return elements;
+
+  const xs = elements.map((element) => element.x);
+  const ys = elements.map((element) => element.y);
+  const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
+  const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
+  return elements.map((element) => {
+    if (element instanceof LineSegment) {
+      return new LineSegment(
+        element.x - centerX,
+        element.y - centerY,
+        element.color,
+        element.size,
+      );
+    }
+    return new StickerElement(
+      element.x - centerX,
+      element.y - centerY,
+      element.img,
+      element.size,
+    );
+  });
+}
+
+const brushSelect = document.getElementById(
+  "brushSelect",
+)! as HTMLSelectElement;
+const createBrushButt = document.getElementById(
+  "createBrushButton",
+)! as HTMLButtonElement;
+brushSelect.addEventListener("change", () => {
+  editor.brushName = brushSelect.value;
+});
+createBrushButt.addEventListener("click", CreateCustomBrush);
+
+function CreateCustomBrush() {
+  const name = prompt("Name your custom brush:")?.trim();
+  if (
+    !name ||
+    name == DEFAULT_BRUSH ||
+    editor.customBrushes.some((brush) => brush.name == name)
+  ) return;
+
+  const elements = CloneBrushElements();
+  if (elements.length == 0) return;
+
+  editor.customBrushes.push({ name, elements });
+  const option = document.createElement("option");
+  option.value = name;
+  option.textContent = name;
+  brushSelect.append(option);
+  brushSelect.value = name;
+  editor.brushName = name;
+  editor.clear();
+  DrawLines();
 }
 
 const clearButt = document.getElementById("clearButton")! as HTMLButtonElement;
