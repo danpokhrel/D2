@@ -35,24 +35,14 @@ canvas.height = CANVAS_HEIGHT;
 
 const context = canvas.getContext("2d")!;
 
-// Pen Settings
-let penColor: string = COLOR_DICT.black;
-let penSize: number = 15;
 const PEN_SIZE_MAX: number = 30;
 const PEN_SIZE_MIN: number = 1;
-
-let curSticker: number = 0;
-let stickerSize: number = 30;
 const STICKER_SIZE_MAX = 120;
 const STICKER_SIZE_MIN = 10;
 
 context.lineCap = "round"; // "square" "round" "butt"
-context.lineWidth = penSize;
 
 type CanvasElement = LineSegment | StickerElement;
-
-const commandList: CanvasElement[][] = []; // A list of canvasElement lists
-const redoList: CanvasElement[][] = []; // Line segments that were removed by undone
 
 interface MouseData {
   x: number;
@@ -60,7 +50,36 @@ interface MouseData {
   clicked: boolean;
   clickType: string;
 }
-const mouse: MouseData = { x: 0, y: 0, clicked: false, clickType: "" };
+
+const editor = {
+  penColor: COLOR_DICT.black,
+  penSize: 15,
+  curSticker: 0,
+  stickerSize: 30,
+  commandList: [] as CanvasElement[][],
+  redoList: [] as CanvasElement[][],
+  mouse: { x: 0, y: 0, clicked: false, clickType: "" } as MouseData,
+  addCommand(command: CanvasElement[]) {
+    this.commandList.push(command);
+    this.redoList.splice(0);
+  },
+  undo() {
+    if (this.commandList.length > 0) {
+      this.redoList.push(this.commandList.pop()!);
+    }
+  },
+  redo() {
+    if (this.redoList.length > 0) {
+      this.commandList.push(this.redoList.pop()!);
+    }
+  },
+  clear() {
+    this.commandList.splice(0);
+    this.redoList.splice(0);
+  },
+};
+const newLine: LineSegment[] = [];
+context.lineWidth = editor.penSize;
 
 function clamp(value: number, min: number, max: number) {
   if (max <= min) {
@@ -70,6 +89,12 @@ function clamp(value: number, min: number, max: number) {
   return (Math.max(min, Math.min(max, value)));
 }
 
+interface Tool {
+  start(): void;
+  move(data: MouseEvent): void;
+  end(data: MouseEvent): void;
+}
+
 //https://coreui.io/blog/how-to-disable-right-click-on-a-website-using-javascript/
 canvas.addEventListener("contextmenu", (d) => {
   d.preventDefault();
@@ -77,63 +102,60 @@ canvas.addEventListener("contextmenu", (d) => {
 
 canvas.addEventListener("mousedown", (d) => {
   GetMouseData(d);
-
-  switch (mouse.clickType) {
-    case DRAW_BUTTON:
-      ChangeCursor(CURSOR_DRAW);
-      break;
-    case STICKER_BUTTON:
-      ChangeCursor(CURSOR_STICKER_ACTIVE);
-      PreviewSticker();
-      break;
-  }
+  GetActiveTool()?.start();
 });
 canvas.addEventListener("mouseup", (d) => {
-  switch (mouse.clickType) {
-    case DRAW_BUTTON:
-      GetMouseData(d);
-      if (newLine.length > 1) commandList.push(newLine.slice());
-      newLine.splice(0);
-      DrawLines();
-      clearRedoList();
-      break;
-
-    case STICKER_BUTTON:
-      ChangeCursor(CURSOR_STICKER_INACTIVE);
-      GetMouseData(d);
-      CreateSticker();
-      DrawLines();
-      clearRedoList();
-      break;
-
-    default:
-      break;
-  }
+  GetActiveTool()?.end(d);
 });
 
 canvas.addEventListener("mousemove", (d) => {
-  switch (mouse.clickType) {
-    case DRAW_BUTTON:
-      Draw(d);
-      CreateLineSeg(d);
-      break;
-
-    case STICKER_BUTTON:
-      GetMouseData(d);
-      PreviewSticker();
-      break;
-
-    default:
-      break;
-  }
+  GetActiveTool()?.move(d);
 });
 canvas.addEventListener("mouseenter", GetMouseData);
 
+const tools: Record<string, Tool> = {
+  [DRAW_BUTTON]: {
+    start() {
+      ChangeCursor(CURSOR_DRAW);
+    },
+    move(data) {
+      Draw(data);
+      CreateLineSeg(data);
+    },
+    end(data) {
+      GetMouseData(data);
+      if (newLine.length > 1) editor.addCommand(newLine.slice());
+      newLine.splice(0);
+      DrawLines();
+    },
+  },
+  [STICKER_BUTTON]: {
+    start() {
+      ChangeCursor(CURSOR_STICKER_ACTIVE);
+      PreviewSticker();
+    },
+    move(data) {
+      GetMouseData(data);
+      PreviewSticker();
+    },
+    end(data) {
+      ChangeCursor(CURSOR_STICKER_INACTIVE);
+      GetMouseData(data);
+      CreateSticker();
+      DrawLines();
+    },
+  },
+};
+
+function GetActiveTool(): Tool | undefined {
+  return tools[editor.mouse.clickType];
+}
+
 function GetMouseData(data: MouseEvent) {
-  mouse.x = data.offsetX;
-  mouse.y = data.offsetY;
-  mouse.clicked = data.buttons != 0;
-  mouse.clickType = MOUSE_BUTTON_LIST[data.buttons] ?? "";
+  editor.mouse.x = data.offsetX;
+  editor.mouse.y = data.offsetY;
+  editor.mouse.clicked = data.buttons != 0;
+  editor.mouse.clickType = MOUSE_BUTTON_LIST[data.buttons] ?? "";
   /* L = 1
    * R = 2
    * L+R = 3
@@ -158,7 +180,7 @@ class LineSegment {
   constructor(
     x: number,
     y: number,
-    color: string = penColor,
+    color: string = editor.penColor,
     size: number = 1,
   ) {
     this.x = x;
@@ -168,15 +190,14 @@ class LineSegment {
   }
 }
 
-const newLine: LineSegment[] = [];
 function CreateLineSeg(data: MouseEvent) {
-  if (mouse.clicked == true) {
+  if (editor.mouse.clicked == true) {
     newLine.push(
       new LineSegment(
-        mouse.x,
-        mouse.y,
-        penColor,
-        penSize,
+        editor.mouse.x,
+        editor.mouse.y,
+        editor.penColor,
+        editor.penSize,
       ),
     );
     GetMouseData(data);
@@ -184,34 +205,42 @@ function CreateLineSeg(data: MouseEvent) {
 }
 
 function Draw(data: MouseEvent) {
-  if (mouse.clicked == true) {
+  if (editor.mouse.clicked == true) {
     context.beginPath();
-    context.moveTo(mouse.x, mouse.y);
+    context.moveTo(editor.mouse.x, editor.mouse.y);
     context.lineTo(data.offsetX, data.offsetY);
-    context.strokeStyle = penColor;
-    context.lineWidth = penSize;
+    context.strokeStyle = editor.penColor;
+    context.lineWidth = editor.penSize;
     context.stroke();
   }
   GetMouseData(data);
 }
 
 function DrawLines() {
-  DrawElements(context, 1, false);
+  PrepareCanvas(context);
+  RenderElements(context, 1);
 }
 
-function DrawElements(
+function PrepareCanvas(
   target: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
-  scale: number,
-  fillBackground: boolean,
+  scale = 1,
+  fillBackground = false,
 ) {
-  target.setTransform(scale, 0, 0, scale, 0, 0);
-  target.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+  target.setTransform(1, 0, 0, 1, 0, 0);
+  target.clearRect(0, 0, CANVAS_WIDTH * scale, CANVAS_HEIGHT * scale);
   if (fillBackground) {
     target.fillStyle = CANVAS_BG_COLOR;
-    target.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    target.fillRect(0, 0, CANVAS_WIDTH * scale, CANVAS_HEIGHT * scale);
   }
+}
+
+function RenderElements(
+  target: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  scale: number,
+) {
+  target.setTransform(scale, 0, 0, scale, 0, 0);
   target.lineCap = "round";
-  for (const element of commandList) {
+  for (const element of editor.commandList) {
     const first = element[0];
     if (!first) continue;
 
@@ -253,7 +282,8 @@ async function ExportHighResolution() {
     throw new Error("Unable to create export canvas context.");
   }
 
-  DrawElements(exportContext, scale, true);
+  PrepareCanvas(exportContext, scale, true);
+  RenderElements(exportContext, scale);
   const blob = await exportCanvas.convertToBlob({ type: "image/png" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
@@ -271,21 +301,13 @@ redoButt.textContent = "Redo";
 redoButt.addEventListener("click", Redo);
 
 function Redo() {
-  if (redoList.length > 0) {
-    commandList.push(redoList.pop()!);
-    DrawLines();
-  }
+  editor.redo();
+  DrawLines();
 }
 
 function Undo() {
-  if (commandList.length > 0) {
-    redoList.push(commandList.pop()!);
-    DrawLines();
-  }
-}
-
-function clearRedoList() {
-  redoList.splice(0);
+  editor.undo();
+  DrawLines();
 }
 
 // This one just clears the screen visually so it can be re-drawn
@@ -296,18 +318,16 @@ function ClearScreen() {
 // This one actualy clears the line list and redo history to get rid of everything
 function EraseScreen() {
   ClearScreen();
-  clearRedoList();
-
-  commandList.splice(0);
+  editor.clear();
 }
 
 // ------------------ Pen Color Section ------------------
 
 // https://www.totaltypescript.com/concepts/type-string-cannot-be-used-to-index-type#solution-1-tighten-the-index
 function ChangeColor(newColor: keyof typeof COLOR_DICT) {
-  penColor = COLOR_DICT[newColor];
+  editor.penColor = COLOR_DICT[newColor];
   UpdateColorIndication(newColor);
-  console.log("Changed color to " + newColor + " [" + penColor + "]");
+  console.log("Changed color to " + newColor + " [" + editor.penColor + "]");
 }
 
 function UpdateColorIndication(colorName: string) {
@@ -344,7 +364,7 @@ function SetPenSize(newSize: number, useLimits: boolean = true) {
     newSize = clamp(newSize, PEN_SIZE_MIN, PEN_SIZE_MAX);
   }
 
-  penSize = newSize;
+  editor.penSize = newSize;
   UpdateSizeIndication();
 }
 
@@ -355,7 +375,7 @@ const penSizePlusButt = document.getElementById(
 )! as HTMLButtonElement;
 penSizePlusButt.textContent = "+";
 penSizePlusButt.addEventListener("click", () => {
-  SetPenSize(penSize + 1);
+  SetPenSize(editor.penSize + 1);
 });
 
 const penSizeMinusButt = document.getElementById(
@@ -363,7 +383,7 @@ const penSizeMinusButt = document.getElementById(
 )! as HTMLButtonElement;
 penSizeMinusButt.textContent = "-";
 penSizeMinusButt.addEventListener("click", () => {
-  SetPenSize(penSize - 1);
+  SetPenSize(editor.penSize - 1);
 });
 
 // Thanks Babboy Had: https://bobbyhadz.com/blog/typescript-property-value-not-exist-type-htmlelement#use-a-type-assertion-to-solve-the-error
@@ -382,8 +402,8 @@ sizeGroup.append(penSizeLabel);
 UpdateSizeIndication();
 
 function UpdateSizeIndication() {
-  sizeMeter.value = String(penSize);
-  penSizeLabel.textContent = ` [Pen size: ${penSize}] `;
+  sizeMeter.value = String(editor.penSize);
+  penSizeLabel.textContent = ` [Pen size: ${editor.penSize}] `;
 }
 
 // ------------------ Sticker Section ------------------
@@ -410,7 +430,7 @@ class StickerElement {
   constructor(
     x: number,
     y: number,
-    img: string = STICKER_LIST[curSticker],
+    img: string = STICKER_LIST[editor.curSticker],
     size: number = 1,
   ) {
     this.x = x;
@@ -420,7 +440,7 @@ class StickerElement {
   }
 }
 
-function GetSticker(index: number = curSticker): string {
+function GetSticker(index: number = editor.curSticker): string {
   return (STICKER_LIST[index]);
 }
 
@@ -428,22 +448,22 @@ function CreateSticker() {
   const newSticker: StickerElement[] = [];
   newSticker.push(
     new StickerElement(
-      mouse.x - stickerSize / 2,
-      mouse.y + stickerSize / 2,
+      editor.mouse.x - editor.stickerSize / 2,
+      editor.mouse.y + editor.stickerSize / 2,
       GetSticker(),
-      stickerSize,
+      editor.stickerSize,
     ),
   );
-  commandList.push(newSticker);
+  editor.addCommand(newSticker);
 }
 
 function PreviewSticker() {
   DrawLines();
-  context.font = `${stickerSize}px serif`;
+  context.font = `${editor.stickerSize}px serif`;
   context.fillText(
     GetSticker(),
-    mouse.x - stickerSize / 2,
-    mouse.y + stickerSize / 2,
+    editor.mouse.x - editor.stickerSize / 2,
+    editor.mouse.y + editor.stickerSize / 2,
   );
 }
 
@@ -454,8 +474,8 @@ stickerPlusButt.textContent = ">";
 stickerPlusButt.addEventListener("click", SelectNextsticker);
 
 function SelectNextsticker() {
-  curSticker++;
-  if (curSticker >= STICKER_LIST.length) curSticker = 0;
+  editor.curSticker++;
+  if (editor.curSticker >= STICKER_LIST.length) editor.curSticker = 0;
   UpdateStickerIndication();
 }
 
@@ -466,8 +486,8 @@ stickerMinusButt.textContent = "<";
 stickerMinusButt.addEventListener("click", SelectPrevsticker);
 
 function SelectPrevsticker() {
-  curSticker--;
-  if (curSticker < 0) curSticker = STICKER_LIST.length - 1;
+  editor.curSticker--;
+  if (editor.curSticker < 0) editor.curSticker = STICKER_LIST.length - 1;
   UpdateStickerIndication();
 }
 
@@ -476,7 +496,7 @@ stickerLabel.textContent = GetSticker();
 
 // deno-lint-ignore no-unused-vars
 function SelectSticker(index: number) {
-  curSticker = clamp(index, 0, STICKER_LIST.length - 1);
+  editor.curSticker = clamp(index, 0, STICKER_LIST.length - 1);
   UpdateStickerIndication();
 }
 
@@ -496,7 +516,7 @@ const stickerSizePlusButt = document.getElementById(
 )! as HTMLButtonElement;
 stickerSizePlusButt.textContent = "+";
 stickerSizePlusButt.addEventListener("click", () => {
-  SetStickerSize(stickerSize + 1);
+  SetStickerSize(editor.stickerSize + 1);
 });
 
 const stickerSizeMinusButt = document.getElementById(
@@ -504,7 +524,7 @@ const stickerSizeMinusButt = document.getElementById(
 )! as HTMLButtonElement;
 stickerSizeMinusButt.textContent = "-";
 stickerSizeMinusButt.addEventListener("click", () => {
-  SetStickerSize(stickerSize - 1);
+  SetStickerSize(editor.stickerSize - 1);
 });
 
 const stickerSizeLabel = document.getElementById("stickerSizeLabel")!;
@@ -520,13 +540,13 @@ function SetStickerSize(newSize: number, useLimits: boolean = true) {
     newSize = clamp(newSize, STICKER_SIZE_MIN, STICKER_SIZE_MAX);
   }
 
-  stickerSize = newSize;
+  editor.stickerSize = newSize;
   UpdateStickerIndication();
 }
 
 function UpdateStickerIndication() {
-  stickerSizeMeter.value = String(stickerSize);
-  stickerSizeLabel.textContent = ` [Sticker Size: ${stickerSize}] `;
+  stickerSizeMeter.value = String(editor.stickerSize);
+  stickerSizeLabel.textContent = ` [Sticker Size: ${editor.stickerSize}] `;
 
   stickerLabel.textContent = GetSticker();
 }
