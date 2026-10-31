@@ -1,8 +1,6 @@
-const app = document.querySelector<HTMLElement>("#app")!;
-
 const CANVAS_WIDTH = 1000;
 const CANVAS_HEIGHT = 500;
-const _CANVAS_BG_COLOR = "hsl(0, 0%, 75%)";
+const CANVAS_BG_COLOR = "hsl(0, 0%, 75%)";
 
 const MOUSE_BUTTON_LIST = ["", "L", "R", "LR", "M", "LM", "MR", "LMR"];
 const DRAW_BUTTON = MOUSE_BUTTON_LIST[1];
@@ -51,18 +49,18 @@ const STICKER_SIZE_MIN = 10;
 context.lineCap = "round"; // "square" "round" "butt"
 context.lineWidth = penSize;
 
-type canvasElement = lineSegment | stickerElement;
+type CanvasElement = LineSegment | StickerElement;
 
-const lineList: canvasElement[][] = []; // A list of canvasElement lists
-const redoList: canvasElement[][] = []; // Line segments that were removed by undone
+const commandList: CanvasElement[][] = []; // A list of canvasElement lists
+const redoList: CanvasElement[][] = []; // Line segments that were removed by undone
 
-interface mouseData {
+interface MouseData {
   x: number;
   y: number;
   clicked: boolean;
   clickType: string;
 }
-const mouse: mouseData = { x: 0, y: 0, clicked: false, clickType: "" };
+const mouse: MouseData = { x: 0, y: 0, clicked: false, clickType: "" };
 
 function clamp(value: number, min: number, max: number) {
   if (max <= min) {
@@ -94,7 +92,7 @@ canvas.addEventListener("mouseup", (d) => {
   switch (mouse.clickType) {
     case DRAW_BUTTON:
       GetMouseData(d);
-      if (newLine.length > 1) lineList.push(newLine.slice());
+      if (newLine.length > 1) commandList.push(newLine.slice());
       newLine.splice(0);
       DrawLines();
       clearRedoList();
@@ -135,7 +133,7 @@ function GetMouseData(data: MouseEvent) {
   mouse.x = data.offsetX;
   mouse.y = data.offsetY;
   mouse.clicked = data.buttons != 0;
-  mouse.clickType = MOUSE_BUTTON_LIST[data.buttons];
+  mouse.clickType = MOUSE_BUTTON_LIST[data.buttons] ?? "";
   /* L = 1
    * R = 2
    * L+R = 3
@@ -144,8 +142,6 @@ function GetMouseData(data: MouseEvent) {
    * M+R = 6
    * L+M+R = 7
    */
-
-  // console.log("Button pressed: " + data.buttons);
 }
 
 function ChangeCursor(newCursor: string) {
@@ -153,7 +149,7 @@ function ChangeCursor(newCursor: string) {
 }
 
 // https://www.reddit.com/r/typescript/comments/15n97m9/can_instanceof_operator_be_used_to_check_if_an/
-class lineSegment {
+class LineSegment {
   x: number;
   y: number;
   color: string;
@@ -172,14 +168,14 @@ class lineSegment {
   }
 }
 
-const newLine: lineSegment[] = [];
+const newLine: LineSegment[] = [];
 function CreateLineSeg(data: MouseEvent) {
   if (mouse.clicked == true) {
     newLine.push(
-      new lineSegment(
+      new LineSegment(
         mouse.x,
         mouse.y,
-        context.strokeStyle.toString(),
+        penColor,
         penSize,
       ),
     );
@@ -195,10 +191,6 @@ function Draw(data: MouseEvent) {
     context.strokeStyle = penColor;
     context.lineWidth = penSize;
     context.stroke();
-    // console.log(
-    //   "mouse: (" + mouse.x + ", " + mouse.y + ") | data: (" + data.offsetX +
-    //     ", " + data.offsetY + ")",
-    // );
   }
   GetMouseData(data);
 }
@@ -215,22 +207,25 @@ function DrawElements(
   target.setTransform(scale, 0, 0, scale, 0, 0);
   target.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
   if (fillBackground) {
-    target.fillStyle = _CANVAS_BG_COLOR;
+    target.fillStyle = CANVAS_BG_COLOR;
     target.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
   }
   target.lineCap = "round";
-  for (const element of lineList) {
-    if (element[0] instanceof lineSegment) {
+  for (const element of commandList) {
+    const first = element[0];
+    if (!first) continue;
+
+    if (first instanceof LineSegment) {
       target.beginPath();
-      target.moveTo(element[0].x, element[0].y);
-      for (const { x, y } of element as lineSegment[]) {
+      target.moveTo(first.x, first.y);
+      for (const { x, y } of element as LineSegment[]) {
         target.lineTo(x, y);
       }
-      target.strokeStyle = element[0].color;
-      target.lineWidth = element[0].size;
+      target.strokeStyle = first.color;
+      target.lineWidth = first.size;
       target.stroke();
-    } else if (element[0] instanceof stickerElement) {
-      for (const { x, y, img, size } of element as stickerElement[]) {
+    } else if (first instanceof StickerElement) {
+      for (const { x, y, img, size } of element as StickerElement[]) {
         target.font = `${size}px serif`;
         target.fillText(img, x, y);
       }
@@ -277,14 +272,14 @@ redoButt.addEventListener("click", Redo);
 
 function Redo() {
   if (redoList.length > 0) {
-    lineList.push(redoList.pop()!);
+    commandList.push(redoList.pop()!);
     DrawLines();
   }
 }
 
 function Undo() {
-  if (lineList.length > 0) {
-    redoList.push(lineList.pop()!);
+  if (commandList.length > 0) {
+    redoList.push(commandList.pop()!);
     DrawLines();
   }
 }
@@ -302,44 +297,27 @@ function ClearScreen() {
 function EraseScreen() {
   ClearScreen();
   clearRedoList();
-  // for (const line of lineList) {
-  //   redoList.push(line);
-  // }
-  lineList.splice(0);
+
+  commandList.splice(0);
 }
 
-//
-//
-//
-// Pen Color Section
-//
-//
-//
+// ------------------ Pen Color Section ------------------
 
 // https://www.totaltypescript.com/concepts/type-string-cannot-be-used-to-index-type#solution-1-tighten-the-index
 function ChangeColor(newColor: keyof typeof COLOR_DICT) {
-  if (COLOR_DICT[newColor] == undefined) {
-    console.warn(
-      'ChangeColor(): "' + newColor +
-        '" is not in the COLOR_DICT.\nCOLOR_DICT: ' + COLOR_DICT,
-    );
-
-    return;
-  }
-
   penColor = COLOR_DICT[newColor];
-  UpdateColorInidication(newColor);
+  UpdateColorIndication(newColor);
   console.log("Changed color to " + newColor + " [" + penColor + "]");
 }
 
-function UpdateColorInidication(colorName: string) {
+function UpdateColorIndication(colorName: string) {
   colorIndicator.textContent = "Current color: " + colorName;
 }
 
 const colorGroup = document.getElementById("colorButtons")!;
 
 const colorIndicator = document.getElementById("colorLabel")!;
-UpdateColorInidication("black");
+UpdateColorIndication("black");
 
 colorGroup.append(colorIndicator);
 for (const color in COLOR_DICT) {
@@ -359,16 +337,10 @@ for (const color in COLOR_DICT) {
   colorGroup.append(colorButt);
 }
 
-//
-//
-//
-// Pen Size Section
-//
-//
-//
+// ------------------ Pen Size Section ------------------
 
-function SetPenSize(newSize: number, constrained: boolean = true) {
-  if (constrained == true) {
+function SetPenSize(newSize: number, useLimits: boolean = true) {
+  if (useLimits == true) {
     newSize = clamp(newSize, PEN_SIZE_MIN, PEN_SIZE_MAX);
   }
 
@@ -414,13 +386,7 @@ function UpdateSizeIndication() {
   penSizeLabel.textContent = ` [Pen size: ${penSize}] `;
 }
 
-//
-//
-//
-// Sticker Section
-//
-//
-//
+// ------------------ Sticker Section ------------------
 
 const stickerGroup = document.getElementById("stickerButtons")!;
 
@@ -435,7 +401,7 @@ function CreateStickerList(): string[] {
   return list;
 }
 
-class stickerElement {
+class StickerElement {
   x: number;
   y: number;
   img: string;
@@ -459,16 +425,16 @@ function GetSticker(index: number = curSticker): string {
 }
 
 function CreateSticker() {
-  const newSticker: stickerElement[] = [];
+  const newSticker: StickerElement[] = [];
   newSticker.push(
-    new stickerElement(
+    new StickerElement(
       mouse.x - stickerSize / 2,
       mouse.y + stickerSize / 2,
       GetSticker(),
       stickerSize,
     ),
   );
-  lineList.push(newSticker);
+  commandList.push(newSticker);
 }
 
 function PreviewSticker() {
@@ -565,5 +531,3 @@ function UpdateStickerIndication() {
   stickerLabel.textContent = GetSticker();
 }
 UpdateStickerIndication();
-
-app.append();

@@ -9,12 +9,12 @@
       border: ridge black;
       border-width: 1vw;
       background-color: lightgrey;
-      cursor: "pointer";
+      cursor: pointer;
     }
     </style>
   </head>
   <body>
-    <p>Left click to draw, right light to place stickers!</p>
+    <p>Left click to draw, right click to place stickers!</p>
 
     <div id="utilButtons">
       <button id="clearButton">Erase All</button>
@@ -33,7 +33,7 @@
       <input type="range" id="penSizeSlider" min="1" max="15"
         value="15" />
       <button id="penSizePlus">+</button>
-      <label for="penSize" id="penSizeLabel">Pen Size</label>
+      <label for="penSizeSlider" id="penSizeLabel">Pen Size</label>
     </div>
 
     <div id="stickerButtons">
@@ -45,7 +45,7 @@
       <input type="range" id="stickerSizeSlider" min="1" max="15"
         value="15" />
       <button id="stickerSizePlus">+</button>
-      <label for="stickerSizeLabel" id="stickerSizeLabel">Sticker Size</label>
+      <label for="stickerSizeSlider" id="stickerSizeLabel">Sticker Size</label>
     </div>
 
     <canvas id="mainCanvas"></canvas>
