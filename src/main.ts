@@ -204,23 +204,35 @@ function Draw(data: MouseEvent) {
 }
 
 function DrawLines() {
-  ClearScreen();
+  DrawElements(context, 1, false);
+}
 
+function DrawElements(
+  target: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  scale: number,
+  fillBackground: boolean,
+) {
+  target.setTransform(scale, 0, 0, scale, 0, 0);
+  target.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+  if (fillBackground) {
+    target.fillStyle = _CANVAS_BG_COLOR;
+    target.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+  }
+  target.lineCap = "round";
   for (const element of lineList) {
     if (element[0] instanceof lineSegment) {
-      context.beginPath();
-      context.moveTo(element[0].x, element[0].y);
+      target.beginPath();
+      target.moveTo(element[0].x, element[0].y);
       for (const { x, y } of element as lineSegment[]) {
-        // console.log("\tCurrent Point:  (" + x + ", " + y + ")");
-        context.lineTo(x, y);
+        target.lineTo(x, y);
       }
-      context.strokeStyle = element[0].color;
-      context.lineWidth = element[0].size;
-      context.stroke();
+      target.strokeStyle = element[0].color;
+      target.lineWidth = element[0].size;
+      target.stroke();
     } else if (element[0] instanceof stickerElement) {
       for (const { x, y, img, size } of element as stickerElement[]) {
-        context.font = `${size}px serif`;
-        context.fillText(img, x, y);
+        target.font = `${size}px serif`;
+        target.fillText(img, x, y);
       }
     }
   }
@@ -229,6 +241,31 @@ function DrawLines() {
 const clearButt = document.getElementById("clearButton")! as HTMLButtonElement;
 clearButt.textContent = "Erase All";
 clearButt.addEventListener("click", EraseScreen);
+
+const exportButt = document.getElementById(
+  "exportButton",
+)! as HTMLButtonElement;
+exportButt.addEventListener("click", ExportHighResolution);
+
+async function ExportHighResolution() {
+  const scale = 2;
+  const exportCanvas = new OffscreenCanvas(
+    CANVAS_WIDTH * scale,
+    CANVAS_HEIGHT * scale,
+  );
+  const exportContext = exportCanvas.getContext("2d");
+  if (!exportContext) {
+    throw new Error("Unable to create export canvas context.");
+  }
+
+  DrawElements(exportContext, scale, true);
+  const blob = await exportCanvas.convertToBlob({ type: "image/png" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "drawing.png";
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
 
 const undoButt = document.getElementById("undoButton")! as HTMLButtonElement;
 undoButt.textContent = "Undo";
